@@ -50,5 +50,8 @@
     <ClInclude Include="cr.h">
       <Filter>Header Files\inc\arch</Filter>
     </ClInclude>
+    <ClInclude Include="vmx.h">
+      <Filter>Header Files\inc\arch</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

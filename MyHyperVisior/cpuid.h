@@ -1,3 +1,6 @@
+#pragma once
+#pragma warning(disable:4201)
+#pragma warning(disable:4214)
 union  __cpuid_t
 {
 	struct

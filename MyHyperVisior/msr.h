@@ -1,4 +1,6 @@
 #pragma once
+#pragma warning(disable:4201)
+#pragma warning(disable:4214)
 union __ia32_efer_t
 {
 	unsigned __int64 control;
