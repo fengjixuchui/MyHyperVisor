@@ -1,3 +1,7 @@
+#pragma once
+#pragma warning(disable:4201)
+#pragma warning(disable:4214)
+
 //
 // Note on exemption of DR4 and DR5:
 //		Debug registers DR4 and DR5 are reserved when debug extensions are enabled (when the DE flag in control
@@ -171,4 +175,5 @@ union __dr7_t
 		unsigned __int64 LEN3 : 2;
 		unsigned __int64 reserved_1 : 32;
 	} bits;
-};#pragma once
+};
+

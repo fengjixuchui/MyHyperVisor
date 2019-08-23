@@ -1,3 +1,6 @@
+#pragma once
+#pragma warning(disable:4201)
+#pragma warning(disable:4214)
 //
 // The status flags (bits 0, 2, 4, 6, 7, and 11) of the EFLAGS register indicate the results of arithmetic instructions,
 // such as the ADD, SUB, MUL, and DIV instructions. The status flag functions are:
@@ -59,4 +62,4 @@ union __rflags_t
 		unsigned __int64 idf : 1;
 		unsigned __int64 reserved_3 : 9;
 	} bits;
-};#pragma once
+};

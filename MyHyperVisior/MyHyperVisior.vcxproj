@@ -153,6 +153,7 @@
     <ClInclude Include="dr.h" />
     <ClInclude Include="msr.h" />
     <ClInclude Include="rflags.h" />
+    <ClInclude Include="vmx.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
