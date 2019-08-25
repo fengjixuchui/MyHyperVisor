@@ -1,6 +1,9 @@
 #pragma once
 #pragma warning(disable:4201)
 #pragma warning(disable:4214)
+
+#define IA32_FEATURE_CONTROL_MSR            0x3aUL
+
 union __ia32_efer_t
 {
 	unsigned __int64 control;

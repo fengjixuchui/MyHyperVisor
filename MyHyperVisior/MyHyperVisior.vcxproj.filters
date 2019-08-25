@@ -30,11 +30,6 @@
     </Inf>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="msr.h">
       <Filter>Header Files\inc\arch</Filter>
     </ClInclude>
@@ -53,5 +48,10 @@
     <ClInclude Include="vmx.h">
       <Filter>Header Files\inc\arch</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Source.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
