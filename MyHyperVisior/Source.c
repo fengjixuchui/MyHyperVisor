@@ -7,38 +7,62 @@
 #include "rflags.h"
 #include "vmx.h"
 
-
-
-void init_logical_processor(struct __vmm_context_t* context, void* guest_rsp)
+/*
+void log_error(char* msg, int vmm_context)
 {
-	struct __vmm_context_t* vmm_context;
-	struct __vcpu_t* vcpu;
-	union __vmx_misc_msr_t vmx_misc;
-	unsigned long processor_number;
-	processor_number = KeGetCurrentProcessorNumber();
-	vmm_context = (struct __vmm_context_t*)context;
-	vcpu = vmm_context->vcpu_table[processor_number];
-	log_debug("vcpu %d guest_rsp = %llX\n", processor_number, guest_rsp);
-	adjust_control_registers();
-	if (!is_vmx_supported()) {
-		log_error("VMX operation is not supported on this processor.\n");
-		free_vmm_context(vmm_context);
-		return;
+	DbgPrint("ERROR::\t%s", msg, vmm_context);
+}
+
+void log_success(char* msg, int vmm_context)
+{
+	DbgPrint("SUCCESS::\t%s", msg, vmm_context);
+}
+
+void log_debug(char* msg, int vmm_context)
+{
+	DbgPrint("DEBUG::\t%s", msg, vmm_context);
+}
+*/
+
+
+void disable_vmx(void)
+{
+	__vmx_off();
+	DbgPrint("VMM OFF!.\n");
+}
+
+struct __vmm_context_t* allocate_vmm_context(void)
+{
+	struct __vmm_context_t* vmm_context = NULL;
+	vmm_context = (struct __vmm_context_t*)ExAllocatePoolWithTag(NonPagedPool, sizeof(struct __vmm_context_t), VMM_TAG);
+	if (vmm_context == NULL) {
+		DbgPrint("Oops! vmm_context could not be allocated.\n");
+		return NULL;
 	}
-	if (!init_vmxon(vcpu)) {
-		log_error("VMXON failed to initialize for vcpu %d.\n", processor_number);
-		free_vcpu(vcpu);
-		disable_vmx();
-		return;
+	vmm_context->processor_count = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
+	vmm_context->vcpu_table = ExAllocatePoolWithTag(NonPagedPool, sizeof(struct __vcpu_t*) * vmm_context->processor_count, VMM_TAG);
+	//
+	// Allocate stack for vm-exit handlers and fill it with garbage
+	// data.
+	//
+	//vmm_context->stack = ExAllocatePoolWithTag(NonPagedPool, VMM_STACK_SIZE, VMM_TAG);
+	//memset(vmm_context->stack, 0xCC, VMM_STACK_SIZE);
+	DbgPrint("vmm_context allocated at %llX\n", vmm_context);
+	DbgPrint("vcpu_table allocated at %llX\n", vmm_context->vcpu_table);
+	//DbgPrint("vmm stack allocated at %llX\n", vmm_context->stack);
+	return vmm_context;
+}
+
+struct __vcpu_t* init_vcpu(void)
+{
+	struct __vcpu_t* vcpu = NULL;
+	vcpu = ExAllocatePoolWithTag(NonPagedPool, sizeof(struct __vcpu_t), VMM_TAG);
+	if (!vcpu) {
+		DbgPrint("Oops! vcpu could not be allocated.\n");
+		return NULL;
 	}
-	if (__vmx_on(&vcpu->vmxon_physical) != 0) {
-		log_error("Failed to put vcpu %d into VMX operation.\n", KeGetCurrentProcessorNumber());
-		free_vcpu(vcpu);
-		disable_vmx();
-		free_vmm_context(vmm_context);
-		return
-	}
-	log_success("vcpu %d is now in VMX operation.\n", KeGetCurrentProcessorNumber());
+	RtlSecureZeroMemory(vcpu, sizeof(struct __vcpu_t));
+	return vcpu;
 }
 
 int init_vmcs(struct __vcpu_t* vcpu, void* guest_rsp, void (*guest_rip)(), int is_pt_allowed)
@@ -63,7 +87,7 @@ int init_vmxon(struct __vcpu_t* vcpu)
 	struct __vmcs_t* vmxon;
 	PHYSICAL_ADDRESS physical_max;
 	if (!vcpu) {
-		log_error("VMXON region could not be initialized. vcpu was null.\n");
+		DbgPrint("VMXON region could not be initialized. vcpu was null.\n");
 		return FALSE;
 	}
 	vmx_basic.control = __readmsr(IA32_VMX_BASIC);
@@ -78,7 +102,13 @@ int init_vmxon(struct __vcpu_t* vcpu)
 	vmxon = vcpu->vmxon;
 	RtlSecureZeroMemory(vmxon, PAGE_SIZE);
 	vmxon->header.all = vmx_basic.bits.vmcs_revision_identifier;
-	log_debug("VMXON for vcpu %d initialized:\n\t-> VA: %llX\n\t-> PA: %llX\n\t-> REV: %X\n",
+	/*log_debug("VMXON for vcpu %d initialized:\n\t-> VA: %llX\n\t-> PA: %llX\n\t-> REV: %X\n",
+		KeGetCurrentProcessorNumber(),
+		vcpu->vmxon,
+		vcpu->vmxon_physical,
+		vcpu->vmxon->header.all);*/
+
+	DbgPrint("VMXON for vcpu %d initialized:\n\t-> VA: %llX\n\t-> PA: %llX\n\t-> REV: %X\n",
 		KeGetCurrentProcessorNumber(),
 		vcpu->vmxon,
 		vcpu->vmxon_physical,
@@ -86,19 +116,7 @@ int init_vmxon(struct __vcpu_t* vcpu)
 	return TRUE;
 }
 
-int vmm_init(void)
-{
-	struct __vmm_context_t* vmm_context;
-	vmm_context = allocate_vmm_context();
-	for (unsigned iter = 0; iter < vmm_context->processor_count; iter++) {
-		vmm_context->vcpu_table[iter] = init_vcpu();
-		vmm_context->vcpu_table[iter]->vmm_context = vmm_context;
-	}
-	init_logical_processor(vmm_context, 0);
-	return TRUE;
-}
-
-int enable_vmx_operation(void)
+int adjust_control_registers(void)
 {
 	//setting the VMX enable bit in CR4.
 	union __cr4_t cr4 = { 0 };
@@ -119,7 +137,7 @@ int enable_vmx_operation(void)
 	return FALSE;
 }//
 
-int VmHasCpuidSupport(void)
+int is_vmx_supported(void)
 {
 
 	union __cpuid_t cpuid = { 0 };
@@ -138,35 +156,50 @@ void init_logical_processor( struct __vmm_context_t *context, void *guest_rsp )
   processor_number = KeGetCurrentProcessorNumber( );
   vmm_context = ( struct __vmm_context_t * )context;
   vcpu = vmm_context->vcpu_table[ processor_number ];
-  log_debug( "vcpu %d guest_rsp = %llX\n", processor_number, guest_rsp );
+  DbgPrint( "vcpu %d guest_rsp = %llX\n", processor_number, guest_rsp );
   adjust_control_registers( );
   if( !is_vmx_supported( ) ) {
-    log_error( "VMX operation is not supported on this processor.\n" );
-    free_vmm_context( vmm_context );
+    DbgPrint( "VMX operation is not supported on this processor.\n" );
+    //free_vmm_context( vmm_context );
     return;
   }
   if( !init_vmxon( vcpu ) ) {
-    log_error( "VMXON failed to initialize for vcpu %d.\n", processor_number );
-    free_vcpu( vcpu );
+   DbgPrint( "VMXON failed to initialize for vcpu %d.\n", processor_number );
+    //free_vcpu( vcpu );
     disable_vmx( );
     return;
   }
   if( __vmx_on( &vcpu->vmxon_physical ) != 0 ) {
-    log_error( "Failed to put vcpu %d into VMX operation.\n", KeGetCurrentProcessorNumber( ) );
-    free_vcpu( vcpu );
-    disable_vmx( );
-    free_vmm_context( vmm_context );
-    return
+    DbgPrint( "Failed to put vcpu %d into VMX operation.\n", KeGetCurrentProcessorNumber( ) );
+    //free_vcpu( vcpu );
+    //disable_vmx( );
+    //free_vmm_context( vmm_context );
+	return;
   }
-  log_success( "vcpu %d is now in VMX operation.\n", KeGetCurrentProcessorNumber( ) );
+  DbgPrint( "vcpu %d is now in VMX operation.\n", KeGetCurrentProcessorNumber( ) );
 }
+
+int vmm_init(void)
+{
+	struct __vmm_context_t* vmm_context;
+	vmm_context = allocate_vmm_context();
+	for (unsigned iter = 0; iter < vmm_context->processor_count; iter++) {
+		vmm_context->vcpu_table[iter] = init_vcpu();
+		//vmm_context->vcpu_table[iter]->vmm_context = vmm_context;
+	}
+	init_logical_processor(vmm_context, 0);
+	return TRUE;
+}
+
+
+
 
 void SampleUnload(_In_ PDRIVER_OBJECT DriverObject) {
 	UNREFERENCED_PARAMETER(DriverObject);
 	DbgPrint("%s - Unloaded ReHV.\n\n", __FUNCTION__);
+	disable_vmx();
 }
 
-extern "C" //Added to prevent linker error. The DriverEntry function must have C-linkage, which is not the default in C++ compilation.
 NTSTATUS
 DriverEntry(
 	PDRIVER_OBJECT DriverObject,
@@ -189,9 +222,6 @@ DriverEntry(
 	DbgPrint("%d Mj version.!", osVersionInfo.dwMajorVersion);
 	DbgPrint("%d Min version.!", osVersionInfo.dwMinorVersion);
 	DbgPrint("%d Build Number.!", osVersionInfo.dwBuildNumber);
-	DbgPrint("%d VMX support.", VmHasCpuidSupport());
-	//VmHasCpuidSupport
-	enable_vmx_operation();
 	vmm_init();
 	return STATUS_SUCCESS;
 }
